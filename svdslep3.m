@@ -16,7 +16,7 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 %          defined thusly (corner points! so the 1 is on the diagonal)
 % J        Number of eigentapers requested [default: 10] 
 % tol      abs(log10(tolerance)) for EIGS [default: 12]
-% ngro     The computational "growth factor" [default: 8]
+% ngro     The computational "growth factor" [default: 3]
 % xver     Performs excessive verification [default: 0]
 %
 % OUTPUT:
@@ -41,7 +41,7 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 % Default values
 defval('J', 10);
 defval('ngro',3);
-defval('xver',1);
+defval('xver',0);
 defval('tol',12);
 
 % Default curve is a CIRCLE in pixel space, of some radius and pixelization
@@ -102,15 +102,14 @@ if ~isstr(XY)
     pause
   end
 
-FJS until here
-
   % Now embed these in a larger size index matrix to get rid of the edge
-  % effects 
-  newsize=ngro*max(size(QX),size(QXK));
-
+  % effects. The spatial domain is the unique reference, in pixels
+  newsize=ngro*size(QX);
+  
+  % Expand the SPATIAL domain
   [QinR,c11cmnR]=cexpand(QinR,QX,QY,newsize);
   
-  [QinK,c11cmnK]=cexpand(QinK,QXK,QYK,newsize);
+  [QinK,c11cmnK]=cexpand(QinK,QX,QY,newsize);
     
   % But now this needs to be turned into a FFTSHIFT
   QinK=indeks(fftshift(v2s(1:prod(newsize))),QinK);
@@ -289,43 +288,42 @@ end
 % Do this for the benefit of the output
 xylimt=[xlimt ylimt];
 
-% Rather a large piece left-over from construction that's now just
-% checking and making a quick plot if you so desire
+% Calculate the full range
+xrange=xlimt(2)-xlimt(1);
+yrange=ylimt(2)-ylimt(1);
+
+if isk==0
+  % Construct a pixel grid with the region inscribed
+  qdx=1; qdy=1;
+else
+  % Construct a 1/pixel grid with the region inscribed
+  % Since this is just for illustration, don't overdo it
+  qdx=1/100; qdy=1/100;
+end
+
+% You'd use these if you wanted a rectangular grid
+Nx=round(xrange/qdx);
+Ny=round(yrange/qdy);
+% but we make it square for now
+[Nx,Ny]=deal(max(Nx,Ny));
+
+% Don't be a fanatic about half pixels as in LOCALIZATION2D but 
+% simply strive for symmetry
+qx=linspace(xlimt(1),xlimt(2),Nx);
+qy=linspace(ylimt(1),ylimt(2),Ny);
+
+% Remember that this may not be square depending on the choices above
+[QX,QY]=meshgrid(qx,qy);
+
+% Should look into this later but it seems right
+QY=flipud(QY);
+
+% The "curve" is not the boundary but rather the last set of "elements" on the "grid".
+% The midpoint indices of this subset that fall inside of the region...
+Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
+
+% Making a quick plot if you so desire
 if xver==1
-  % Calculate the full range
-  xrange=xlimt(2)-xlimt(1);
-  yrange=ylimt(2)-ylimt(1);
-
-  if isk==0
-    % Construct a pixel grid with the region inscribed
-    qdx=1; qdy=1;
-  else
-    % Construct a 1/pixel grid with the region inscribed
-    % Since this is just for illustration, don't overdo it
-    qdx=1/100; qdy=1/100;
-  end
-  
-  % You'd use these if you wanted a rectangular grid
-  Nx=round(xrange/qdx);
-  Ny=round(yrange/qdy);
-  % but we make it square for now
-  [Nx,Ny]=deal(max(Nx,Ny));
-  
-  % Don't be a fanatic about half pixels as in LOCALIZATION2D but 
-  % simply strive for symmetry
-  qx=linspace(xlimt(1),xlimt(2),Nx);
-  qy=linspace(ylimt(1),ylimt(2),Ny);
-
-  % Remember that this may not be square depending on the choices above
-  [QX,QY]=meshgrid(qx,qy);
-  
-  % Should look into this later but it seems right
-  QY=flipud(QY);
-
-  % The "curve" is not the boundary but rather the last set of "elements" on the "grid".
-  % The midpoint indices of this subset that fall inside of the region...
-  Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
-  
   clf
   plot(QX,QY,'k.'); hold on 
   plot(QX(Qin),QY(Qin),'o'); 
@@ -342,7 +340,9 @@ varargout=varns(1:nargout);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function [newQin,c11cmn]=cexpand(Qin,QX,QY,newsize)
-oldsize=size(QX); 
+% Expands a rectangular area enclosing a curve to a new size and
+% recomputes the indices of the interior points
+oldsize=size(QX);
 addon=round([newsize-oldsize]/2);
 [i,j]=ind2sub(oldsize,Qin);
 newQin=sub2ind(newsize,i+addon(1),j+addon(2));
