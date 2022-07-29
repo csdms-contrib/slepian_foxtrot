@@ -8,12 +8,10 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 %
 % XY       [X(:) Y(:)] coordinates of a SPATIAL-domain curve, in pixels
 % KXY      [X(:) Y(:)] coordinates of a SPECTRAL-domain half-curve, 
-%          i.e. in the positive (including zero) spectral halfplane
-%          corresponding to the spatial domain computationally grown by a
-%          factor input below. The coordinates here are relative to the size
-%          of that half-plane, CORNER points assuming UNIT wavenumber
+%          i.e. in the positive (including zero) spectral halfplane. 
+%          The coordinates here are relative to the ultimate size of that
+%          half-plane, with the CORNER points assuming UNIT wavenumber 
 %          values, so they will be ratios, fractions of the Nyquist-plane
-%          defined thusly (corner points! so the 1 is on the diagonal)
 % J        Number of eigentapers requested [default: 10] 
 % tol      abs(log10(tolerance)) for EIGS [default: 12]
 % ngro     The computational "growth factor" [default: 3]
@@ -41,7 +39,7 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 % Default values
 defval('J', 10);
 defval('ngro',3);
-defval('xver',0);
+defval('xver',1);
 defval('tol',12);
 
 % Default curve is a CIRCLE in pixel space, of some radius and pixelization
@@ -92,7 +90,7 @@ if ~isstr(XY)
     axis ij
 
     subplot(224)
-    dom=zeros(size(QXK)); dom(QinK)=1; 
+    dom=zeros(size(QXK)); dom(QinK)=1;
     % F/Make a wavenumber axis, purely formal for now
     Kn=knum2(size(dom)); imagesc(Kn); axis image ; hold on
     spy(dom,'kx')
@@ -106,23 +104,51 @@ if ~isstr(XY)
   % effects. The spatial domain is the unique reference, in pixels
   newsize=ngro*size(QX);
   
-  % Expand the SPATIAL domain
-  [QinR,c11cmnR]=cexpand(QinR,QX,QY,newsize);
-  
-  [QinK,c11cmnK]=cexpand(QinK,QX,QY,newsize);
-    
-  % But now this needs to be turned into a FFTSHIFT
-  QinK=indeks(fftshift(v2s(1:prod(newsize))),QinK);
+  % Expand the SPATIAL domain by adding to the size
+  [QinR,c11cmnR,QinRor]=cexpand(QinR,QX,QY,newsize);
+
+% We have QinK on some fake convenience grid but now we need to 
+% find the same ones in the scaled grid as appropriate for the newsize of
+% the spatial domain, using the relative coordinates that were input
+
+disp('FJS not fixed yet')
+
+% Can't expand by adding linearly in K space, probably best to scale the
+% curve to the new dimensions and repolyogonizing it
+
+  % Expand the SPECTRAL domain which is reciprocal to the space grid
+x  [QinK,c11cmnK,QinKor]=cexpand(QinK,QXK,QYK,newsize);
 
   if xver==1
     clf
-    subplot(121)
+    subplot(221)
+    dom=zeros(size(QX)); dom(QinRor)=1; spy(dom)
+
+    subplot(222)
     dom=zeros(newsize); dom(QinR)=1; spy(dom)
-    axis ij
-    aa=axis;
-    subplot(122)
-    dom=zeros(newsize); dom(QinK)=1; spy(fftshift(dom))
+    hold on
+    % The curve in PIXEL coordinates needs to plot right on here
+    twoplot(XY+repmat(size(dom)/2,size(XY,1),1),'k')
+
+    subplot(223)
+    dom=zeros(size(QXK)); dom(QinKor)=1; spy(dom)
+
+    subplot(224)
+    dom=zeros(newsize); dom(QinK)=1; spy(dom)
+    hold on
+
+    % The curve in FRACTIONAL coordinates needs to plot right on here
+    twoplot(KXY.*repmat(size(dom),size(KXY,1),1)...
+	    +repmat(size(dom)/2,size(KXY,1),1),'k')
+
+    disp(sprintf('\nHit ENTER to proceed\n'))
+    pause
   end
+
+  % But now this needs to be turned into a FFTSHIFT
+  QinK=indeks(fftshift(v2s(1:prod(newsize))),QinK);
+
+keyboard
 
   % Now make the operators that we are trying to diagonalize
   P=@(x) proj(x,QinR);
@@ -189,6 +215,7 @@ elseif strcmp(XY,'demo1')
   % Compute the eigenfunctions
   [E,V,c11cmnR,c11cmnK,SE,KXY]=svdslep3(XY,KXY,J);
   
+keyboard
 FJS until here
 
   % Quick fix
@@ -339,9 +366,10 @@ varns={xylimt,Qin,QX,QY,XY};
 varargout=varns(1:nargout);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [newQin,c11cmn]=cexpand(Qin,QX,QY,newsize)
+function [newQin,c11cmn,Qin]=cexpand(Qin,QX,QY,newsize)
 % Expands a rectangular area enclosing a curve to a new size and
-% recomputes the indices of the interior points
+% recomputes the indices of the interior points and the axis limits; 
+% also returns the original indices for graphical comparison
 oldsize=size(QX);
 addon=round([newsize-oldsize]/2);
 [i,j]=ind2sub(oldsize,Qin);
