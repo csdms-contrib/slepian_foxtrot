@@ -57,9 +57,14 @@ defval('KXY',...
 if ~isstr(XY)
   % Check the curves and return the range on the inside 
   % For the SPATIAL part
-  [xylimit,QinR,QX,QY,XY]=ccheck(XY,0,xver);
+  [xylimit,QinR,QX,QY,XY]=ccheck(XY,0,[],xver);
+
+  % Save the original 
+KXYor=KXY;
   % For the SPECTRAL part - including the mirrored symmetry
-  [kxylimt,QinK,QXK,QYK,KXY]=ccheck(KXY,1,xver);
+  [kxylimt,QinK,QXK,QYK,KXY]=ccheck(KXY,1,[],xver);
+  % Save the original 
+QinKor=QinK;
 
   % Check - again! - if you must
   if xver==1
@@ -105,19 +110,20 @@ if ~isstr(XY)
   newsize=ngro*size(QX);
   
   % Expand the SPATIAL domain by adding to the size
-  [QinR,c11cmnR,QinRor]=cexpand(QinR,QX,QY,newsize);
+  [QinR,c11cmnR,QinRor]=cexpand(QinR,QX,QY,newsize,0);
 
-% We have QinK on some fake convenience grid but now we need to 
-% find the same ones in the scaled grid as appropriate for the newsize of
-% the spatial domain, using the relative coordinates that were input
+  % We have QinK on some fake convenience grid but now we need to find the
+  % same ones in the scaled grid as appropriate for the newsize of the
+  % spatial domain, using the relative coordinates that were input
+  % originally. Expand the SPECTRAL domain which is reciprocal to the space
+  % grid. Cannot expand by adding linearly in K space, probably best to
+  % scale the curve to the new dimensions and repolyogonizing it. 
 
-disp('FJS not fixed yet')
+  % If I am going to reuse this should have done this at the start
+  [kxylimt,QinK,QXK,QYK,KXY]=ccheck(KXYor,1,1./newsize,xver);
 
-% Can't expand by adding linearly in K space, probably best to scale the
-% curve to the new dimensions and repolyogonizing it
-
-  % Expand the SPECTRAL domain which is reciprocal to the space grid
-x  [QinK,c11cmnK,QinKor]=cexpand(QinK,QXK,QYK,newsize);
+  % And now you need to take into account the full space domain
+  [QinK,c11cmnK,QinKor]=cexpand(QinK,QXK,QYK,newsize,0);
 
   if xver==1
     clf
@@ -145,10 +151,10 @@ x  [QinK,c11cmnK,QinKor]=cexpand(QinK,QXK,QYK,newsize);
     pause
   end
 
+keyboard
+
   % But now this needs to be turned into a FFTSHIFT
   QinK=indeks(fftshift(v2s(1:prod(newsize))),QinK);
-
-keyboard
 
   % Now make the operators that we are trying to diagonalize
   P=@(x) proj(x,QinR);
@@ -216,7 +222,6 @@ elseif strcmp(XY,'demo1')
   [E,V,c11cmnR,c11cmnK,SE,KXY]=svdslep3(XY,KXY,J);
   
 keyboard
-FJS until here
 
   % Quick fix
   c11=c11cmnR(1:2);
@@ -273,11 +278,12 @@ FJS until here
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function varargout=ccheck(XY,isk,xver)
+function varargout=ccheck(XY,isk,qdxdy,xver)
 % Given pixel coordinates of a closed curve XY, makes a centered grid that
-% encloses it. For the spatial domain (isk=0), that's it. For the spectral
-% domain (isk=1), it assumes the curve is in the half-plane, and doubles
-% it. Partially stripped from LOCALIZATION2D.
+% encloses it. For the spatial domain (isk=0), that's it (qdxdy=1). For the
+% spectral domain (isk=1), it assumes the curve is in the half-plane, and
+% mirrors it, but you can choose qdxdy. Partially stripped from
+% LOCALIZATION2D.
 %
 % OUTPUT:
 %
@@ -315,18 +321,20 @@ end
 % Do this for the benefit of the output
 xylimt=[xlimt ylimt];
 
-% Calculate the full range
+% Calculate the full range of the input
 xrange=xlimt(2)-xlimt(1);
 yrange=ylimt(2)-ylimt(1);
 
 if isk==0
   % Construct a pixel grid with the region inscribed
-  qdx=1; qdy=1;
+  defval('qdxdy',[1 1])
 else
   % Construct a 1/pixel grid with the region inscribed
   % Since this is just for illustration, don't overdo it
-  qdx=1/100; qdy=1/100;
+  defval('qdxdy',[1 1]/100)
 end
+qdx=qdxdy(1);
+qdy=qdxdy(2);
 
 % You'd use these if you wanted a rectangular grid
 Nx=round(xrange/qdx);
@@ -366,20 +374,29 @@ varns={xylimt,Qin,QX,QY,XY};
 varargout=varns(1:nargout);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [newQin,c11cmn,Qin]=cexpand(Qin,QX,QY,newsize)
-% Expands a rectangular area enclosing a curve to a new size and
-% recomputes the indices of the interior points and the axis limits; 
-% also returns the original indices for graphical comparison
+function [newQin,c11cmn,Qin]=cexpand(Qin,QX,QY,newsize,isk)
+% Expands a rectangular area enclosing a curve to a new size and recomputes
+% the indices of the interior points and the axis limits; also returns the
+% original indices for graphical comparison. 
+
+% In the spectral domain the space doesn't grow linearly
+defval('isk',0)
+
 oldsize=size(QX);
 addon=round([newsize-oldsize]/2);
 [i,j]=ind2sub(oldsize,Qin);
 newQin=sub2ind(newsize,i+addon(1),j+addon(2));
-addx=range(QX(1,:))/size(QX,2)*addon(2);
-addy=range(QY(:,1))/size(QY,1)*addon(1);
-c11=[min(QX(1,:)) max(QY(:,1))]+[-addx addy];
-cmn=[max(QX(1,:)) min(QY(:,1))]+[addx -addy];
-c11cmn=[c11 cmn];
-
+if isk==0
+  addx=range(QX(1,:))/size(QX,2)*addon(2);
+  addy=range(QY(:,1))/size(QY,1)*addon(1);
+  c11=[min(QX(1,:)) max(QY(:,1))]+[-addx addy];
+  cmn=[max(QX(1,:)) min(QY(:,1))]+[addx -addy];
+  c11cmn=[c11 cmn];
+else
+  % Just the Nyquist in wavenumber space for pixel spacing
+  c11cmn=[-1 1 1 -1]*pi;
+end
+  
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function Pv=proj(v,p)
 % Projects the vector v on the indices p
