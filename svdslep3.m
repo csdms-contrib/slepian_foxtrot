@@ -39,7 +39,7 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 
 % Default values
 defval('J', 10);
-defval('ngro',3);
+defval('ngro',2);
 defval('xver',1);
 defval('tol',12);
 
@@ -57,17 +57,38 @@ defval('KXY',...
 
 if ~isstr(XY)
   % Check the curves and return the range on the inside 
-  % For the SPATIAL part, before the growth domain
-  [xylimit,QinR,QX,QY,XY]=ccheck(XY,0,[],xver);
+  % For the SPATIAL part, before the growth domain, in pixels
+  [XY,QinR,QX,QY]=ccheck(XY,0,[1 1]);
 
-  % Save the original 
-KXYor=KXY;
-  % For the SPECTRAL part - including the mirrored symmetry
-  [kxylimt,QinK,QXK,QYK,KXY]=ccheck(KXY,1,[],xver);
-  % Save the original 
-QinKor=QinK;
+  % Now embed these in a larger size index matrix to get rid of the edge
+  % effects. The spatial domain is the unique reference, in pixels
+  newsize=ngro*size(QX);
+  
+  % Expand the SPATIAL domain and recompute the coordinates
+  [QinR,c11cmnR]=cexpand(QinR,QX,QY,newsize,0);
 
-  % Check - again! - if you must
+  % For the SPECTRAL part, mirrored, in the discretization appropriate to
+  % the growth domain, still relative to the Nyquist plane
+  [KXY,QinK,QXK,QYK]=ccheck(KXY,1,1./newsize);
+
+  % % This must be Hermitian, which is easy for a full square
+  dom=zeros(size(QXK)); dom(QinK)=1;
+  difer(isreal(ifft2(ifftshift(dom)))-1,[],[],NaN)
+
+  % Expand the SPECTRAL domain to return the full Nyquist plane
+  [QinK,c11cmnK]=cexpand(QinK,QXK,QYK,newsize,1);
+
+  % Enforce Hermiticity by taking out the first row and column of match
+  % since the dci component (see KNUM2) will be in the lower right
+  % quadrant since the data set will be even no matter what
+  [i,j]=ind2sub(newsize,QinK);
+  QinK=QinK(i>min(i)&j>min(j));
+  
+  % This too must be Hermitian!
+  dom=zeros(newsize); dom(QinK)=1;
+  difer(isreal(ifft2(ifftshift(dom)))-1,[],[],NaN)
+
+  % Now you are ready for a check
   if xver==1
     clf
     % Plot the SPATIAL region of interest exactly as input
@@ -77,84 +98,46 @@ QinKor=QinK;
     [X0,Y0]=centroid(XY(:,1),XY(:,2));
     plot(X0,Y0,'b+')
     axis equal
+    % Just open up the axes a bit
     xlim(minmax(XY(:))*1.5)
     ylim(minmax(XY(:))*1.5)
 
-    % Plot the SPECTRAL region of interest exactly as input
+    % Plot the SPECTRAL region of interest after the mirroring operation
     subplot(222)
     plot(KXY(:,1),KXY(:,2),'r'); hold on
-    % This centroid is assumed to be zero, also the curve now contains a NaN
+    % This centroid remains zero, but the mirrored curve now contains a NaN
     [KX0,KY0]=deal(0);
     plot(KX0,KY0,'r+')
     axis equal
+    % Open up the axes to the full Nyquist plane, corners at [+/-1 +/-1]
     axis([-1 1 -1 1]/sqrt(2))
 
     subplot(223)
-    dom=zeros(size(QX)); dom(QinR)=1; 
-    % F/Make a pixel axis, purely formal for now
+    % Plot the SPATIAL region of interest after the growth domain
+    dom=zeros(newsize); dom(QinR)=1;
     spy(dom)
-    axis ij
+    % The original curve in PIXEL coordinates needs to plot right on here
+    % Add the one to reconcile with SPY
+    hold on
+    twoplot(XY+repmat(size(dom)/2+1,size(XY,1),1),'k')
+    hold off
 
     subplot(224)
-    dom=zeros(size(QXK)); dom(QinK)=1;
-    % F/Make a wavenumber axis, purely formal for now
-    Kn=knum2(size(dom)); imagesc(Kn); axis image ; hold on
-    spy(dom,'kx')
-    % Check that this is Hermitian, formally
-    difer(isreal(ifft2(ifftshift(dom)))-1,[],[],NaN)
-    disp(sprintf('\nHit ENTER to proceed\n'))
-    pause
-  end
-
-  % Now embed these in a larger size index matrix to get rid of the edge
-  % effects. The spatial domain is the unique reference, in pixels
-  newsize=ngro*size(QX);
-  
-  % Expand the SPATIAL domain by adding to the size
-  [QinR,c11cmnR,QinRor]=cexpand(QinR,QX,QY,newsize,0);
-
-  % We have QinK on some fake convenience grid but now we need to find the
-  % same ones in the scaled grid as appropriate for the newsize of the
-  % spatial domain, using the relative coordinates that were input
-  % originally. Expand the SPECTRAL domain which is reciprocal to the space
-  % grid. Cannot expand by adding linearly in K space, probably best to
-  % scale the curve to the new dimensions and repolyogonizing it. 
-
-  % If I am going to reuse this should have done this at the start
-  [kxylimt,QinK,QXK,QYK,KXY]=ccheck(KXYor,1,1./newsize,xver);
-
-  % And now you need to take into account the full space domain
-  [QinK,c11cmnK,QinKor]=cexpand(QinK,QXK,QYK,newsize,0);
-
-  if xver==1
-    clf
-    subplot(221)
-    dom=zeros(size(QX)); dom(QinRor)=1; spy(dom)
-
-    subplot(222)
-    dom=zeros(newsize); dom(QinR)=1; spy(dom)
-    hold on
-    % The curve in PIXEL coordinates needs to plot right on here
-    twoplot(XY+repmat(size(dom)/2,size(XY,1),1),'k')
-
-    subplot(223)
-    dom=zeros(size(QXK)); dom(QinKor)=1; spy(dom)
-
-    subplot(224)
-    dom=zeros(newsize); dom(QinK)=1; spy(dom)
-    hold on
-
+    % Plot the SPECTRAL region of interest after the growth domain
+    dom=zeros(newsize); dom(QinK)=1;
+    spy(dom)
     % The curve in FRACTIONAL coordinates needs to plot right on here
+    hold on
+    % Add the one to reconcile with SPY
     twoplot(KXY.*repmat(size(dom),size(KXY,1),1)...
-	    +repmat(size(dom)/2,size(KXY,1),1),'k')
+	    +repmat(size(dom)/2+1,size(KXY,1),1),'k')
+    hold off
 
     disp(sprintf('\nHit ENTER to proceed\n'))
     pause
   end
 
-keyboard
-
-  % But now this needs to be turned into a FFTSHIFT
+  % The SPECTRAL domain this needs to be turned into a Fourier operator
   QinK=indeks(fftshift(v2s(1:prod(newsize))),QinK);
 
   % Now make the operators that we are trying to diagonalize
@@ -222,8 +205,6 @@ elseif strcmp(XY,'demo1')
   % Compute the eigenfunctions
   [E,V,c11cmnR,c11cmnK,SE,KXY]=svdslep3(XY,KXY,J);
   
-keyboard
-
   % Quick fix
   c11=c11cmnR(1:2);
   cmn=c11cmnR(3:4);
@@ -258,8 +239,8 @@ keyboard
   EE=sum(repmat(V(:)',length(E),1).*E.^2,2);
   SEE=sum(repmat(V(:)',length(E),1).*SE.^2,2);
   imagefnan(c11,cmn,v2s(EE)); axis image 
-  hold on
-  plot(XY(:,1),XY(:,2),'k'); hold off
+  hold on; plot(XY(:,1),XY(:,2),'k'); hold off
+  title('Eigenvalue weighted SPATIAL sum')
   subplot(122)
   psdens=fftshift(decibel(v2s(SEE)));
   psdens(psdens<-80)=NaN;
@@ -267,6 +248,7 @@ keyboard
   axis([c11(1) cmn(1) cmn(2) c11(2)]/4)
   hold on
   plot(KXY(:,1),KXY(:,2),'k'); hold off
+  title('Eigenvalue weighted SPECTRAL sum')
 
   % Also try this one here
   figure(3)
@@ -279,22 +261,19 @@ keyboard
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function varargout=ccheck(XY,isk,qdxdy,xver)
-% Given pixel coordinates of a closed curve XY, makes a centered grid that
+function varargout=ccheck(XY,isk,qdxdy)
+% Given PIXEL coordinates of a closed curve XY, makes a centered grid that
 % encloses it. For the spatial domain (isk=0), that's it (qdxdy=1). For the
 % spectral domain (isk=1), it assumes the curve is in the half-plane, and
-% mirrors it, but you can choose qdxdy. Partially stripped from
-% LOCALIZATION2D.
+% mirrors it, but you now require qdxdy. Stripped from LOCALIZATION2D.
 %
 % OUTPUT:
 %
-% xylimit   Limits of the grid, which is still in pixel units but centered
-% Qin       Index set with the grid pixels inside the curve  
-% QX,QY     Actual grid points in both coordinate directions     
-% XY        The input curve, again
+% XY        The input curve (isk=0), or its mirrored version (isk=1)
+% Qin       Index set with the grid pixels inside the curve
+% QX,QY     Actual grid points meshed in both coordinate directions     
 
-defval('xver',0)
-% In the spectral domain the input curve needs to be doubled
+% In the spectral domain the input curve will be doubled
 defval('isk',0)
 
 % Make sure the XY of the curve has two columns
@@ -309,31 +288,24 @@ end
 % Find limits in x and y so as to contain the curves
 if isk==0
   % We're in x-space
-  xlimt=minmax(XY(:,1)); 
-  ylimt=minmax(XY(:,2)); 
+  xlimt=minmax(XY(:,1));
+  ylimt=minmax(XY(:,2));
+  % The spacings are in pixels
+  qdxdy=[1 1];
 elseif isk==1
-  % We're in k-space, symmetrize the half curve
+  % We're in k-space, mirror the half curve
   xlimt=[-1 1]*max(abs(XY(:,1)));
   % Note that input Y must be >= 0
   ylimt=[-1 1]*max(XY(:,2));
-  % Mirror the curve itself
+  % Mirror the curve 
   XY=[XY ; NaN NaN ; flipud(-XY)];
 end
-% Do this for the benefit of the output
-xylimt=[xlimt ylimt];
 
 % Calculate the full range of the input
 xrange=xlimt(2)-xlimt(1);
 yrange=ylimt(2)-ylimt(1);
 
-if isk==0
-  % Construct a pixel grid with the region inscribed
-  defval('qdxdy',[1 1])
-else
-  % Construct a 1/pixel grid with the region inscribed
-  % Since this is just for illustration, don't overdo it
-  defval('qdxdy',[1 1]/100)
-end
+% Grid spacings
 qdx=qdxdy(1);
 qdy=qdxdy(2);
 
@@ -358,24 +330,21 @@ QY=flipud(QY);
 % The midpoint indices of this subset that fall inside of the region...
 Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
 
-% Making a quick plot if you so desire
+xver=0;
 if xver==1
   clf
-  plot(QX,QY,'k.'); hold on 
-  plot(QX(Qin),QY(Qin),'o'); 
-  twoplot(XY)
+  plot(QX,QY,'k.')
+  hold on; axis image
+  plot(QX(Qin),QY(Qin),'bo')
   hold off
-  axis image
-  disp(sprintf('\nHit ENTER to proceed\n'))
-  pause
 end
 
 % OPTIONAL OUTPUT
-varns={xylimt,Qin,QX,QY,XY};
+varns={XY,Qin,QX,QY};
 varargout=varns(1:nargout);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [newQin,c11cmn,Qin]=cexpand(Qin,QX,QY,newsize,isk)
+function [newQin,c11cmn]=cexpand(Qin,QX,QY,newsize,isk)
 % Expands a rectangular area enclosing a curve to a new size and recomputes
 % the indices of the interior points and the axis limits; also returns the
 % original indices for graphical comparison. 
