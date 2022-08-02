@@ -6,25 +6,26 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 %
 % INPUT:
 %
-% XY       [X(:) Y(:)] coordinates of a SPATIAL-domain curve, in pixels
-% KXY      [X(:) Y(:)] coordinates of a SPECTRAL-domain half-curve, 
+% XY       [X(:) Y(:)] coordinates of a SPATIAL-domain curve, in PIXELS
+% KXY      [X(:) Y(:)] coordinates of a SPECTRAL-domain HALF-curve, 
 %          i.e. in the positive (including zero) spectral halfplane. 
-%          The coordinates here are relative to the ultimate size of that
+%          The coordinates here are RELATIVE to the ultimate size of that
 %          half-plane, with the CORNER points assuming UNIT wavenumber 
-%          values, so they will be ratios, fractions of the Nyquist-plane
+%          values, so they will be ratios, fractions of the Nyquist
+%          plane, after the computational growth of the SPACE plane
 % J        Number of eigentapers requested [default: 10] 
 % tol      abs(log10(tolerance)) for EIGS [default: 12]
 % ngro     The computational "growth factor" [default: 3]
-% xver     Performs excessive verification [default: 0]
+% xver     Performs excessive verification, making plots
 %
 % OUTPUT:
 %
 % E        The eigenfunctions of the concentration problem
 % V        The eigenvalues of the concentration problem
-% c11cmnR  The spatial coordinates of the top left corner
-% c11cmnK  The spectral coordinates of the top left corner
+% c11cmnR  The spatial coordinates of the top left corner after growth
+% c11cmnK  The spectral coordinates of the top left corner after growth
 % SE       The periodogram of the eigenfunctions
-% KXY      The symmetrized spectral-space domain
+% KXY      The symmetrized spectral-space domain curve
 %
 % EXAMPLE:
 %
@@ -34,7 +35,7 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 %
 % LOCALIZATION2D
 %
-% Last modified by fjsimons-at-alum.mit.edu, 07/29/2022
+% Last modified by fjsimons-at-alum.mit.edu, 08/02/2022
 
 % Default values
 defval('J', 10);
@@ -42,7 +43,7 @@ defval('ngro',3);
 defval('xver',1);
 defval('tol',12);
 
-% Default curve is a CIRCLE in pixel space, of some radius and pixelization
+% Default curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
 defval('cN',41)
 defval('XY',...
@@ -56,7 +57,7 @@ defval('KXY',...
 
 if ~isstr(XY)
   % Check the curves and return the range on the inside 
-  % For the SPATIAL part
+  % For the SPATIAL part, before the growth domain
   [xylimit,QinR,QX,QY,XY]=ccheck(XY,0,[],xver);
 
   % Save the original 
