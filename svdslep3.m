@@ -41,7 +41,7 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 % Default values
 defval('J',10);
 defval('ngro',4);
-defval('xver',1);
+defval('xver',0);
 defval('tol',12);
 
 % Default curve is a CIRCLE in PIXEL space, of radius cR and cN points
@@ -52,7 +52,7 @@ defval('XY',...
 % And some (half-)square in the spectral (half-)space
 % Here you use the notion of the Shannon ratio as in SVDSLEP2, which is
 % relative to the grown area which has unit (kx,ky) in the CORNERS
-defval('R',0.2)
+defval('R',0.1)
 defval('KXY',...
        R*[-1 1  1 -1 -1; 1 1  0  0  1]')
 
@@ -62,7 +62,7 @@ if ~isstr(XY)
   fname=hash([J ngro tol XY(:)' R KXY(:)'],'SHA-256');
   fnams=fullfile(getenv('IFILES'),'HASHES',sprintf('%s_%s.mat',upper(mfilename),fname));
 
-  if ~exist(fnams,'file')
+  if ~exist(fnams,'file') | 1==1
     t=tic;
 
     % Check the curves and return the range on the inside 
@@ -221,7 +221,7 @@ elseif strcmp(XY,'demo1')
   XY=cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]';
   % And a box in SPECTRAL space, no need to close it as it will get
   % mirrored anyway about the lower symmetry axis...
-  R=0.1;
+  R=0.2;
   KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
 
   % How many eigenfunctions?
