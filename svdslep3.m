@@ -79,33 +79,31 @@ if ~isstr(XY)
     newsize=ngro*[Ny Nx];
     
     % Expand the SPATIAL domain and recompute the coordinates
-    [QinR,c11cmnR]=cexpand(XY,xlimt,ylimt,[Ny Nx],newsize,0,xver*0);
+    [QinR,c11cmnR,QX,QY]=cexpand(XY,xlimt,ylimt,[Ny Nx],newsize,0,xver*0);
 
     % For the SPECTRAL part, mirrored, in the discretization appropriate to
     % the growth domain, still relative to the Nyquist plane
-    [KXY,kxlimt,kylimt,Nkx,Nky]=ccheck(KXY,1,1./newsize,xver);
+    [KXY,kxlimt,kylimt,Nkx,Nky]=ccheck(KXY,1,1./newsize,xver*0);
 
     % Expand the SPECTRAL domain to return the full Nyquist plane
-    [QinK,c11cmnK]=cexpand(KXY,kxlimt,kylimt,[Ny Nx],newsize,1,xver);
+    [QinK,c11cmnK,QKX,QKY]=cexpand(KXY,kxlimt,kylimt,[Ny Nx],newsize,1,xver*0);
 
     % Enforce Hermiticity by taking out the first row and column of match
     % since the dci component (see KNUM2) will be in the lower right
     % quadrant since the data set will be even no matter what
-%    [i,j]=ind2sub(newsize,QinK);
-%    QinK=QinK(i>min(i)&j>min(j));
+    [i,j]=ind2sub(newsize,QinK);
+    QinK=QinK(i>min(i)&j>min(j));
     
     % The result must be Hermitian!
     dom=zeros(newsize); dom(QinK)=1;
-    difer(isreal(ifft2(ifftshift(dom)))-1,[],[],NaN)
-
-keyboard
+    difer(isreal(ifft2(ifftshift(dom)))-1,[],[],[])
 
     % Now you are ready for a check
     if xver==1
       clf
       % Plot the SPATIAL region of interest exactly as input
       ah(1)=subplot(221);
-      plot(XY(:,1),XY(:,2),'b'); hold on
+      twoplot(XY,'b'); hold on
       % Compute the centroid - my function is from SAGA, but R2022a has its own
       [X0,Y0]=centroid(XY(:,1),XY(:,2));
       plot(X0,Y0,'b+')
@@ -116,8 +114,8 @@ keyboard
 
       % Plot the SPECTRAL region of interest after the mirroring operation
       ah(2)=subplot(222);
-      plot(KXY(:,1),KXY(:,2),'r'); hold on
-      % This centroid remains zero, but the mirrored curve now contains a NaN
+      twoplot([KXY ; KXY(1,:)],'r'); hold on
+      % This centroid remains zero
       [KX0,KY0]=deal(0);
       plot(KX0,KY0,'r+')
       axis equal; grid on
@@ -126,32 +124,35 @@ keyboard
 
       ah(3)=subplot(223);
       % Plot the SPATIAL region of interest after the growth domain
-      dom=zeros(newsize); dom(QinR)=1;
-      spy(dom)
+      plot(QX(QinR),QY(QinR),'k.')
       % The original curve in PIXEL coordinates needs to plot right on here
       hold on
-      % Fiddle with the curve by half a unit
-      twoplot(XY+repmat(size(dom)/2+1/2,size(XY,1),1),'k')
+      twoplot(XY,'k','LineWidth',2)
       hold off
-      grid on
+      axis equal; grid on
 
       ah(4)=subplot(224);
       % Plot the SPECTRAL region of interest after the growth domain
-      dom=zeros(newsize); dom(QinK)=1;
-      spy(dom)
+      plot(QKX(QinK),QKY(QinK),'k.')
       % The curve in FRACTIONAL coordinates needs to plot right on here
       hold on
       % Fiddle with the curve by one unit
-      twoplot(KXY.*repmat(size(dom)/2,size(KXY,1),1)...
-	      +repmat(size(dom)/2+1,size(KXY,1),1),'b','LineWidth',2)
+      twoplot([KXY ; KXY(1,:)],'b','LineWidth',2)
       hold off
       grid on
+      axis([-1 1 -1 1])
 
-      ntix=5;
-      set(ah(3:4),...
-	     'xtick',unique([1:round(size(dom,2)/ntix):size(dom,2) size(dom,2)]))
-      set(ah(3:4),...
-	     'ytick',unique([1:round(size(dom,1)/ntix):size(dom,1) size(dom,1)]))
+      ntix=4;
+      % Non-pathological Pixel coordinates should round gracefully
+      set(ah(3),'xtick',sort(unique(round(...
+       		 [c11cmnR(1):round(range(c11cmnR([1 3]))/ntix):c11cmnR(3) c11cmnR(3)]))))
+      set(ah(3),'ytick',sort(unique(round(...
+       		 [c11cmnR(4):round(range(c11cmnR([2 4]))/ntix):c11cmnR(2) c11cmnR(2)]))))
+      % Spectral coordinates are already fractions and need to include% zero
+      set(ah(4),'xtick',sort(unique(round(...
+       		 [0 c11cmnK(1):round(range(c11cmnK([1 3])*100)/ntix)/100:c11cmnK(3) c11cmnK(3)]*100)/100)))
+      set(ah(4),'ytick',sort(unique(round(...
+       		 [0 c11cmnK(4):round(range(c11cmnK([2 4]))*100/ntix)/100:c11cmnK(2) c11cmnK(2)]*100)/100)))
       set(ah(3:4),'GridLineStyle',':')
 
       disp(sprintf('\nHit ENTER to proceed\n'))
@@ -227,7 +228,7 @@ elseif strcmp(XY,'demo1')
   XY=cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]';
 
   % A random blob, fix the radius to be something sizable in pixels
-  [x,y]=blob(1,3); XY=[x y]*20; 
+  %[x,y]=blob(1,3); XY=[x y]*20; 
 
   % And a BOX in SPECTRAL space, no need to close it as it will get
   % mirrored anyway about the lower symmetry axis...
@@ -235,7 +236,7 @@ elseif strcmp(XY,'demo1')
   KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
 
   % A random blob in relative coordinates that are somewhat appropriate
-  [kx,ky]=blob(1,3); KXY=[kx ky]/3; KXY=KXY(KXY(:,2)>=0,:);
+  %[kx,ky]=blob(1,3); KXY=[kx ky]/3; KXY=KXY(KXY(:,2)>=0,:);
 
   % How many eigenfunctions?
   J=60;
@@ -406,7 +407,7 @@ varns={XY,xlimt,ylimt,Nx,Ny};
 varargout=varns(1:nargout);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [Qin,c11cmn]=cexpand(XY,xlimt,ylimt,oldsize,newsize,isk,xver)
+function [Qin,c11cmn,QX,QY]=cexpand(XY,xlimt,ylimt,oldsize,newsize,isk,xver)
 % Expands a rectangular area enclosing a curve to a new size and computes
 % the indices of the interior points and the axis limits
 
