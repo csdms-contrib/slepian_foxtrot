@@ -42,7 +42,7 @@ function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
 defval('J',10);
 defval('ngro',4);
 defval('tol',12);
-defval('xver',0);
+defval('xver',1);
 
 % Default SPATIAL curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
@@ -71,36 +71,34 @@ if ~isstr(XY)
 
     % Check the curves and return the range on the inside 
     % For the SPATIAL part, before the growth domain, in pixels
-    [XY,QinR,QX,QY]=ccheck(XY,0,[1 1]);
+    [XY,xlimt,ylimt,Nx,Ny]=ccheck(XY,0,[1 1],xver*0);
 
     % Now embed this in a larger-size matrix to get rid of edge effects and
     % control the spectral discretization. The spatial domain is the unique
-    % reference, in pixels, for everything that comes below.
-    newsize=ngro*size(QX);
+    % reference, in pixels, for everything that comes below. Mind the order!
+    newsize=ngro*[Ny Nx];
     
     % Expand the SPATIAL domain and recompute the coordinates
-    [QinR,c11cmnR]=cexpand(QinR,QX,QY,newsize,0,XY);
+    [QinR,c11cmnR]=cexpand(XY,xlimt,ylimt,[Ny Nx],newsize,0,xver*0);
 
     % For the SPECTRAL part, mirrored, in the discretization appropriate to
     % the growth domain, still relative to the Nyquist plane
-    [KXY,QinK,QXK,QYK]=ccheck(KXY,1,1./newsize);
-
-    % % This must be Hermitian, which is easy for a full square
-    dom=zeros(size(QXK)); dom(QinK)=1;
-    difer(isreal(ifft2(ifftshift(dom)))-1,[],[],NaN)
+    [KXY,kxlimt,kylimt,Nkx,Nky]=ccheck(KXY,1,1./newsize,xver);
 
     % Expand the SPECTRAL domain to return the full Nyquist plane
-    [QinK,c11cmnK]=cexpand(QinK,QXK,QYK,newsize,1);
+    [QinK,c11cmnK]=cexpand(KXY,kxlimt,kylimt,[Ny Nx],newsize,1,xver);
 
     % Enforce Hermiticity by taking out the first row and column of match
     % since the dci component (see KNUM2) will be in the lower right
     % quadrant since the data set will be even no matter what
-    [i,j]=ind2sub(newsize,QinK);
-    QinK=QinK(i>min(i)&j>min(j));
+%    [i,j]=ind2sub(newsize,QinK);
+%    QinK=QinK(i>min(i)&j>min(j));
     
-    % This too must be Hermitian!
+    % The result must be Hermitian!
     dom=zeros(newsize); dom(QinK)=1;
     difer(isreal(ifft2(ifftshift(dom)))-1,[],[],NaN)
+
+keyboard
 
     % Now you are ready for a check
     if xver==1
@@ -236,6 +234,9 @@ elseif strcmp(XY,'demo1')
   R=0.1;
   KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
 
+  % A random blob in relative coordinates that are somewhat appropriate
+  [kx,ky]=blob(1,3); KXY=[kx ky]/3; KXY=KXY(KXY(:,2)>=0,:);
+
   % How many eigenfunctions?
   J=60;
   % Compute the eigenfunctions
@@ -308,7 +309,7 @@ elseif strcmp(XY,'demo1')
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function varargout=ccheck(XY,isk,qdxdy)
+function varargout=ccheck(XY,isk,qdxdy,xver)
 % Given PIXEL coordinates of a closed curve XY, makes a symmetric centered
 % enclosing grid. For the SPATIAL domain (isk=0), that's it (qdxdy=1). For
 % the SPECTRAL domain (isk=1), it assumes the curve is in the half-plane,
@@ -316,12 +317,14 @@ function varargout=ccheck(XY,isk,qdxdy)
 %
 % OUTPUT:
 %
-% XY        The input curve (isk=0), or its mirrored version (isk=1)
-% Qin       Index set with the grid pixels inside the curve
-% QX,QY     Actual grid points meshed in both coordinate directions     
+% XY            The input curve (isk=0), or its mirrored version (isk=1)
+% xlimt,ylimt   The limits of the grid
+% Nx,Ny         The dimensions of the grid
 
-% In the spectral domain the input curve will be doubled
+% In the spectral domain the input curve will be mirrored
 defval('isk',0)
+% This has been uber-verified as it is
+defval('xver',0);
 
 % Make sure the XY of the curve has two columns
 if ~isempty(find(size(XY,2)==2))
@@ -344,8 +347,9 @@ elseif isk==1
   xlimt=[-1 1]*max(abs(XY(:,1)));
   % Note that input Y must be >= 0
   ylimt=[-1 1]*max(XY(:,2));
-  % Actially mirror the curve 
-  XY=[XY ; NaN NaN ; flipud(-XY)];
+  % Actually mirror the curve; do not stick in NaNs or they might end up
+  % not matching any input zeros; may need to watch POLY2CW
+  XY=[XY ; -XY];
 end
 
 % Calculate the full range of the input
@@ -362,24 +366,22 @@ Ny=round(yrange/qdy);
 % but we make the dimensions (not the domain!) square for now
 [Nx,Ny]=deal(max(Nx,Ny));
 
-% Don't be a fanatic about half pixels as in LOCALIZATION2D but 
-% simply strive for symmetry
-qx=linspace(xlimt(1),xlimt(2),Nx);
-qy=linspace(ylimt(1),ylimt(2),Ny);
-
-% Remember that these may not be square depending on the choices above
-[QX,QY]=meshgrid(qx,qy);
-
-% Should look into this later but it seems right
-%QY=flipud(QY);
-
-% The "curve" is not the boundary but rather the last set of "elements" on the "grid".
-% The midpoint indices of this subset that fall inside of the region...
-Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
-
-% This has been uber-verified as it is
-defval('xver',1);
+% Only need to do this if you want to inspect it
 if xver==1
+  % Don't be a fanatic about half pixels as in LOCALIZATION2D but 
+  % simply strive for symmetry
+  qx=linspace(xlimt(1),xlimt(2),Nx);
+  qy=linspace(ylimt(1),ylimt(2),Ny);
+  
+  % Remember that these may not be square depending on the choices above
+  [QX,QY]=meshgrid(qx,qy);
+
+  % The "curve" is not the boundary but rather the last set of "elements" on the "grid".
+  % The midpoint indices of this subset that fall inside of the region...
+  Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
+  
+  % Make a plot
+  figure(1)
   clf
   plot(QX,QY,'k.')
   hold on; axis image
@@ -388,7 +390,8 @@ if xver==1
   xlim(minmax(QX(:))*1.1)
   ylim(minmax(QY(:))*1.1)
   shrink(gca,1.25,1.25); longticks(gca,2)
-  t=title(sprintf('Verifying CCHECK %ix%i',size(QX)));
+  t=title(sprintf('Verifying CCHECK %i x %i isk %i',...
+		  size(QX),isk));
   movev(t,max(abs(QY(:)))/20)
   disp(sprintf('\nHit ENTER to proceed or CTRL-C to abort\n'))
   % Plot the original curve in actual coordinates
@@ -398,50 +401,53 @@ if xver==1
   pause
 end
 
-% OPTIONAL OUTPUT
-varns={XY,Qin,QX,QY};
+% Optional output
+varns={XY,xlimt,ylimt,Nx,Ny};
 varargout=varns(1:nargout);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [newQin,c11cmn]=cexpand(Qin,QX,QY,newsize,isk,XY)
-% Expands a rectangular area enclosing a curve to a new size and recomputes
-% the indices of the interior points and the axis limits; also returns the
-% original indices for graphical comparison. 
+function [Qin,c11cmn]=cexpand(XY,xlimt,ylimt,oldsize,newsize,isk,xver)
+% Expands a rectangular area enclosing a curve to a new size and computes
+% the indices of the interior points and the axis limits
 
-% In the spectral domain the space doesn't grow linearly
 defval('isk',0)
-
-oldsize=size(QX);
-addon=round([newsize-oldsize]/2);
-[i,j]=ind2sub(oldsize,Qin);
-newQin=sub2ind(newsize,i+addon(1),j+addon(2));
-
-if isk==0
-  addx=range(QX(1,:))/size(QX,2)*addon(2);
-  addy=range(QY(:,1))/size(QY,1)*addon(1);
-  c11=[min(QX(1,:)) max(QY(:,1))]+[-addx  addy];
-  cmn=[max(QX(1,:)) min(QY(:,1))]+[ addx -addy];
-  c11cmn=[c11 cmn];
-else
-  % Just the Nyquist in wavenumber space for pixel spacing
-  c11cmn=[-1 1 1 -1];
-end
-
 % This also should work like a charm all the time
 defval('xver',1);
+
+% How many rows and columns to add on either size?
+addon=round([newsize-oldsize]/2);
+
+if isk==0
+  % Actually add to the space domain in pixel spacing
+  addx=range(ylimt)/oldsize(2)*addon(2);
+  addy=range(xlimt)/oldsize(1)*addon(1);
+  c11=[xlimt(1) ylimt(2)]+[-addx  addy];
+  cmn=[xlimt(2) ylimt(1)]+[ addx -addy];
+else
+  % The Nyquist plane in wavenumber space in relative coordinates
+  c11=[-1  1];
+  cmn=[ 1 -1];
+end
+c11cmn=[c11 cmn];
+
+% Now compute the coordinates in the embedding
+qx=linspace(c11(1),cmn(1),newsize(2));
+qy=linspace(cmn(2),c11(2),newsize(1));
+[QX,QY]=meshgrid(qx,qy);
+Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
+
 if xver==1
+  figure(2)
   clf
-  qx=linspace(c11(1),cmn(1),newsize(2));
-  qy=linspace(cmn(2),c11(2),newsize(1));
-  [QX,QY]=meshgrid(qx,qy);
   plot(QX,QY,'k.')
   hold on; axis image
-  plot(QX(newQin),QY(newQin),'bo')
+  plot(QX(Qin),QY(Qin),'bo')
   hold off
   xlim(minmax(QX(:))*1.1)
   ylim(minmax(QY(:))*1.1)
   shrink(gca,1.25,1.25); longticks(gca,2)
-  t=title(sprintf('Verifying CEXPAND %ix%i from %ix%i',oldsize,newsize));
+  t=title(sprintf('Verifying CEXPAND %i x %i from %i x %i isk %i',...
+		  newsize,oldsize,isk));
   movev(t,max(abs(QY(:)))/20)
   disp(sprintf('\nHit ENTER to proceed or CTRL-C to abort\n'))
   % Plot the original curve in actual coordinates
@@ -450,7 +456,6 @@ if xver==1
   hold off
   pause
 end
-
   
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function Pv=proj(v,p)
