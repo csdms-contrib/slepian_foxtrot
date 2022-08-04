@@ -1,5 +1,5 @@
-function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
-% [E,V,c11cmnR,c11cmnK,SE,KXY]=SVDSLEP3(XY,KXY,J,tol,ngro,xver)
+function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
+% [E,V,c11cmnR,c11cmnK,SE,KXY]=SVDSLEP3(XY,KXY,J,ngro,tol,xver)
 %
 % Two-dimensional Slepian functions with arbitrary concentration/limiting
 % regions in the Cartesian spatial and (half-)spectral domains.
@@ -8,14 +8,14 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 %
 % XY       [X(:) Y(:)] coordinates of a SPATIAL-domain curve, in PIXELS
 % KXY      [X(:) Y(:)] coordinates of a SPECTRAL-domain HALF-curve, 
-%          i.e. in the positive (including zero) spectral halfplane. 
+%          i.e. in the POSITIVE (including zero) spectral halfplane. 
 %          The coordinates here are RELATIVE to the ultimate size of that
 %          half-plane, with the CORNER points assuming UNIT wavenumber 
 %          values, so they will be ratios, fractions of the Nyquist
 %          plane, after the computational growth of the SPACE plane
 % J        Number of eigentapers requested [default: 10] 
-% tol      abs(log10(tolerance)) for EIGS [default: 12]
 % ngro     The computational "growth factor" [default: 3]
+% tol      abs(log10(tolerance)) for EIGS [default: 12]
 % xver     Performs excessive verification, making plots
 %
 % OUTPUT:
@@ -30,7 +30,7 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 %
 % EXAMPLE:
 %
-% svdslep3('demo1')
+% svdslep3('demo1',ngro) % with ngro the growth factor
 % 
 % SEE ALSO:
 %
@@ -41,27 +41,31 @@ function varargout=svdslep3(XY,KXY,J,tol,ngro,xver)
 % Default values
 defval('J',10);
 defval('ngro',4);
-defval('xver',0);
 defval('tol',12);
+defval('xver',0);
 
-% Default curve is a CIRCLE in PIXEL space, of radius cR and cN points
+% Default SPATIAL curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
 defval('cN',41)
 defval('XY',...
        cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]')
-% And some (half-)square in the spectral (half-)space
+
+% And some (half-)square in the SPECTRAL (half-)space
 % Here you use the notion of the Shannon ratio as in SVDSLEP2, which is
 % relative to the grown area which has unit (kx,ky) in the CORNERS
 defval('R',0.1)
+% Remember this R is strictly for convenience in the next line
 defval('KXY',...
        R*[-1 1  1 -1 -1; 1 1  0  0  1]')
 
 if ~isstr(XY)
   % Check if we've already computed these
   % Make a hash with the input variables so you don't recompute
-  fname=hash([J ngro tol XY(:)' R KXY(:)'],'SHA-256');
+  fname=hash([XY(:)' KXY(:)' J ngro tol],'SHA-256');
+  % You're going to need an environmental variable and an appropriate directory
   fnams=fullfile(getenv('IFILES'),'HASHES',sprintf('%s_%s.mat',upper(mfilename),fname));
 
+  % Compute and save or load if presaved
   if ~exist(fnams,'file') | 1==1
     t=tic;
 
@@ -69,12 +73,13 @@ if ~isstr(XY)
     % For the SPATIAL part, before the growth domain, in pixels
     [XY,QinR,QX,QY]=ccheck(XY,0,[1 1]);
 
-    % Now embed these in a larger size index matrix to get rid of the edge
-    % effects. The spatial domain is the unique reference, in pixels
+    % Now embed this in a larger-size matrix to get rid of edge effects and
+    % control the spectral discretization. The spatial domain is the unique
+    % reference, in pixels, for everything that comes below.
     newsize=ngro*size(QX);
     
     % Expand the SPATIAL domain and recompute the coordinates
-    [QinR,c11cmnR]=cexpand(QinR,QX,QY,newsize,0);
+    [QinR,c11cmnR]=cexpand(QinR,QX,QY,newsize,0,XY);
 
     % For the SPECTRAL part, mirrored, in the discretization appropriate to
     % the growth domain, still relative to the Nyquist plane
@@ -215,19 +220,26 @@ if ~isstr(XY)
   varns={E,V,c11cmnR,c11cmnK,SE,XY,KXY};
   varargout=varns(1:nargout);
 elseif strcmp(XY,'demo1')
+  % Fake the second input now as the growth factor
+  defval('KXY',[]); ngro=KXY; clear KXY
+
   % A circle in SPACE...
   cR=30;
   cN=41;
   XY=cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]';
-  % And a box in SPECTRAL space, no need to close it as it will get
+
+  % A random blob, fix the radius to be something sizable in pixels
+  [x,y]=blob(1,3); XY=[x y]*20; 
+
+  % And a BOX in SPECTRAL space, no need to close it as it will get
   % mirrored anyway about the lower symmetry axis...
-  R=0.2;
+  R=0.1;
   KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
 
   % How many eigenfunctions?
-  J=40;
+  J=60;
   % Compute the eigenfunctions
-  [E,V,c11cmnR,c11cmnK,SE,XY,KXY]=svdslep3(XY,KXY,J);
+  [E,V,c11cmnR,c11cmnK,SE,XY,KXY]=svdslep3(XY,KXY,J,ngro);
 
   % Plot the first offs+3 basis functions
   offs=0;
@@ -297,10 +309,10 @@ end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function varargout=ccheck(XY,isk,qdxdy)
-% Given PIXEL coordinates of a closed curve XY, makes a centered grid that
-% encloses it. For the spatial domain (isk=0), that's it (qdxdy=1). For the
-% spectral domain (isk=1), it assumes the curve is in the half-plane, and
-% mirrors it, but you now require qdxdy. Stripped from LOCALIZATION2D.
+% Given PIXEL coordinates of a closed curve XY, makes a symmetric centered
+% enclosing grid. For the SPATIAL domain (isk=0), that's it (qdxdy=1). For
+% the SPECTRAL domain (isk=1), it assumes the curve is in the half-plane,
+% and mirrors it, but you now require qdxdy. Stripped from LOCALIZATION2D.
 %
 % OUTPUT:
 %
@@ -329,10 +341,10 @@ if isk==0
   qdxdy=[1 1];
 elseif isk==1
   % We're in k-space, mirror the half curve
-  xlimt=[-1 1]*max(abs(XY(:,1)))/2;
+  xlimt=[-1 1]*max(abs(XY(:,1)));
   % Note that input Y must be >= 0
-  ylimt=[-1 1]*max(XY(:,2))/2;
-  % Mirror the curve 
+  ylimt=[-1 1]*max(XY(:,2));
+  % Actially mirror the curve 
   XY=[XY ; NaN NaN ; flipud(-XY)];
 end
 
@@ -347,7 +359,7 @@ qdy=qdxdy(2);
 % You'd use these if you wanted a rectangular grid
 Nx=round(xrange/qdx);
 Ny=round(yrange/qdy);
-% but we make it square for now
+% but we make the dimensions (not the domain!) square for now
 [Nx,Ny]=deal(max(Nx,Ny));
 
 % Don't be a fanatic about half pixels as in LOCALIZATION2D but 
@@ -355,25 +367,34 @@ Ny=round(yrange/qdy);
 qx=linspace(xlimt(1),xlimt(2),Nx);
 qy=linspace(ylimt(1),ylimt(2),Ny);
 
-% Remember that this may not be square depending on the choices above
+% Remember that these may not be square depending on the choices above
 [QX,QY]=meshgrid(qx,qy);
 
 % Should look into this later but it seems right
-QY=flipud(QY);
+%QY=flipud(QY);
 
 % The "curve" is not the boundary but rather the last set of "elements" on the "grid".
 % The midpoint indices of this subset that fall inside of the region...
 Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
 
-% This is trite
-xver=0;
+% This has been uber-verified as it is
+defval('xver',1);
 if xver==1
   clf
   plot(QX,QY,'k.')
   hold on; axis image
   plot(QX(Qin),QY(Qin),'bo')
   hold off
-  disp(sprintf('\nHit ENTER to proceed\n'))
+  xlim(minmax(QX(:))*1.1)
+  ylim(minmax(QY(:))*1.1)
+  shrink(gca,1.25,1.25); longticks(gca,2)
+  t=title(sprintf('Verifying CCHECK %ix%i',size(QX)));
+  movev(t,max(abs(QY(:)))/20)
+  disp(sprintf('\nHit ENTER to proceed or CTRL-C to abort\n'))
+  % Plot the original curve in actual coordinates
+  hold on
+  plot(XY(:,1),XY(:,2),'y','LineWidth',2)
+  hold off
   pause
 end
 
@@ -382,7 +403,7 @@ varns={XY,Qin,QX,QY};
 varargout=varns(1:nargout);
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [newQin,c11cmn]=cexpand(Qin,QX,QY,newsize,isk)
+function [newQin,c11cmn]=cexpand(Qin,QX,QY,newsize,isk,XY)
 % Expands a rectangular area enclosing a curve to a new size and recomputes
 % the indices of the interior points and the axis limits; also returns the
 % original indices for graphical comparison. 
@@ -394,6 +415,7 @@ oldsize=size(QX);
 addon=round([newsize-oldsize]/2);
 [i,j]=ind2sub(oldsize,Qin);
 newQin=sub2ind(newsize,i+addon(1),j+addon(2));
+
 if isk==0
   addx=range(QX(1,:))/size(QX,2)*addon(2);
   addy=range(QY(:,1))/size(QY,1)*addon(1);
@@ -405,15 +427,27 @@ else
   c11cmn=[-1 1 1 -1];
 end
 
-% This should work
-xver=0;
+% This also should work like a charm all the time
+defval('xver',1);
 if xver==1
   clf
+  qx=linspace(c11(1),cmn(1),newsize(2));
+  qy=linspace(cmn(2),c11(2),newsize(1));
+  [QX,QY]=meshgrid(qx,qy);
   plot(QX,QY,'k.')
   hold on; axis image
-  plot(QX(Qin),QY(Qin),'bo')
+  plot(QX(newQin),QY(newQin),'bo')
   hold off
-  disp(sprintf('\nHit ENTER to proceed\n'))
+  xlim(minmax(QX(:))*1.1)
+  ylim(minmax(QY(:))*1.1)
+  shrink(gca,1.25,1.25); longticks(gca,2)
+  t=title(sprintf('Verifying CEXPAND %ix%i from %ix%i',oldsize,newsize));
+  movev(t,max(abs(QY(:)))/20)
+  disp(sprintf('\nHit ENTER to proceed or CTRL-C to abort\n'))
+  % Plot the original curve in actual coordinates
+  hold on
+  plot(XY(:,1),XY(:,2),'y','LineWidth',2)
+  hold off
   pause
 end
 
