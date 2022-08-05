@@ -257,7 +257,7 @@ elseif strcmp(XY,'demo1')
   if (-1)^round(rand)
     % And a BOX in SPECTRAL space, no need to close it as it will get
     % mirrored anyway about the lower symmetry axis...
-    R=0.1;
+    R=0.13;
     KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
   else
     % A random blob in relative coordinates that are somewhat appropriate
