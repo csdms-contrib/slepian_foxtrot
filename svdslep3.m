@@ -420,8 +420,8 @@ addon=round([newsize-oldsize]/2);
 
 if isk==0
   % Actually add to the space domain in pixel spacing
-  addx=range(ylimt)/oldsize(2)*addon(2);
-  addy=range(xlimt)/oldsize(1)*addon(1);
+  addx=range(xlimt)/oldsize(2)*addon(2);
+  addy=range(ylimt)/oldsize(1)*addon(1);
   c11=[xlimt(1) ylimt(2)]+[-addx  addy];
   cmn=[xlimt(2) ylimt(1)]+[ addx -addy];
 else
