@@ -42,7 +42,7 @@ function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
 defval('J',10);
 defval('ngro',4);
 defval('tol',12);
-defval('xver',1);
+defval('xver',0);
 
 % Default SPATIAL curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
@@ -67,7 +67,7 @@ if ~isstr(XY)
 
   % Compute and save or load if presaved
   if ~exist(fnams,'file') | 1==1
-    t=tic;
+    tt=tic;
 
     % Check the curves and return the range on the inside 
     % For the SPATIAL part, before the growth domain, in pixels
@@ -91,19 +91,19 @@ if ~isstr(XY)
     [QinK,c11cmnK,QKX,QKY]=cexpand(KXY,1,newsize,[],[],xver);
 
     % Ensure hermiticity if the domain is even knowing it was square
-    if any(rem(newsize,2))
-      % Take out the first row and column of match
-      % since the dci component (see KNUM2) will be in the lower right
-      % quadrant since the data set will be even no matter what.
-      % This worked for the square but not for random blobs
+    if ~any(rem(newsize,2))
+      % The dci component (see KNUM2) will be in the lower right quadrant
       %[i,j]=ind2sub(newsize,QinK);
-      %QinK=QinK(i>min(i)&j>min(j));
+      % QinK=QinK(i>min(i)&j>min(j));
+      % Maybe just add a row and a column to the top?
+      %QinK=sub2ind(newsize,i-1,j-1);
+      % Got to do something - but caught this case within CEXPAND
     end
         
     % The result must be Hermitian!
     dom=zeros(newsize); dom(QinK)=1;
-    disp('Checking for Hermitian symmetry ')
-    difer(isreal(ifft2(ifftshift(dom)))-1,[],2,[])
+    disp(sprintf('\nChecking for Hermitian symmetry\n'))
+    difer(isreal(ifft2(ifftshift(dom)))-1,[],1,[])
 
     % Now you are ready for a check, really a repeat of what's been CCHECKED
     % and CEXPAND already
@@ -125,21 +125,21 @@ if ~isstr(XY)
       ylabel('vertical pixels')
 
       % Plot the SPECTRAL region of interest after the mirroring operation
-      ah(2)=subplot(222)t;
+      ah(2)=subplot(222);
       twoplot([KXY ; KXY(1,:)],'r','LineWidth',1.5); hold on
       % This centroid remains zero
       [KX0,KY0]=deal(0);
       plot(KX0,KY0,'ro')
       axis equal; grid on
       % Open up the axes to the full Nyquist plane, corners at [+/-1 +/-1]
-      axis([-1 1 -1 1])i
+      axis([-1 1 -1 1])
       t(2)=title('Spectral-domain input curve');
       xlabel('scaled horizontal wavenumbers')
       ylabel('scaled vertical wavenumbers')
 
       ah(3)=subplot(223);
       % Plot the SPATIAL region of interest after the growth domain
-      plot(QX(QinR),QY(QcinR),'k.')
+      plot(QX(QinR),QY(QinR),'k.')
       % The original curve in PIXEL coordinates needs to plot right on here
       hold on
       twoplot(XY,'k','LineWidth',2)
@@ -231,7 +231,7 @@ if ~isstr(XY)
       SE=NaN;
     end
 
-    disp(sprintf('%s took %f seconds',upper(mfilename),toc(t)))
+    disp(sprintf('%s took %f seconds',upper(mfilename),toc(tt)))
     save(fnams,'E','V','c11cmnR','c11cmnK','SE','XY','KXY')
   else
     disp(sprintf('%s loading %s',upper(mfilename),fnams))
@@ -244,21 +244,25 @@ elseif strcmp(XY,'demo1')
   % Fake the second input now as the growth factor
   defval('KXY',[]); ngro=KXY; clear KXY
 
-  % A circle in SPACE...
-  cR=30;
-  cN=41;
-  XY=cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]';
-
-  % A random blob, fix the radius to be something sizable in pixels
-  [x,y]=blob(1,1); XY=[x y]*20; 
-
-  % And a BOX in SPECTRAL space, no need to close it as it will get
-  % mirrored anyway about the lower symmetry axis...
-  R=0.1;
-  KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
-
-  % A random blob in relative coordinates that are somewhat appropriate
-  [kx,ky]=blob(1,1); KXY=[kx ky]/3; KXY=KXY(KXY(:,2)>=0,:);
+  % Randomize the test
+  if (-1)^round(rand)
+    % A circle in SPACE...
+    cR=30;
+    cN=41;
+    XY=cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]';
+  else
+    % A random blob, fix the radius to be something sizable in pixels
+    [x,y]=blob(1,1); XY=[x y]*20; 
+  end
+  if (-1)^round(rand)
+    % And a BOX in SPECTRAL space, no need to close it as it will get
+    % mirrored anyway about the lower symmetry axis...
+    R=0.1;
+    KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
+  else
+    % A random blob in relative coordinates that are somewhat appropriate
+    [kx,ky]=blob(1,1); KXY=[kx ky]/3; KXY=KXY(KXY(:,2)>=0,:);
+  end
 
   % How many eigenfunctions?
   J=60;
@@ -379,6 +383,9 @@ if nargout>1 || xver==1
   % ...but we make the dimensions (not the domain!) square for now which helps
   % with the Hermiticity constraint and the sampling of the Nyquist plane
   [Nx,Ny]=deal(max(Nx,Ny));
+  % Force the output to be ODD for Hermiticity, so the zero-wavenumber is centered
+  Nx=Nx+~rem(Nx,2);
+  Ny=Ny+~rem(Ny,2);
 else
   [xlimt,ylimt,Ny,Nx]=deal(NaN);
 end
