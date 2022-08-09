@@ -278,7 +278,7 @@ elseif strcmp(XY,'demo1')
     axes(ah(ind))
     imagefnan(c11cmnR(1:2),c11cmnR(3:4),v2s(E(:,ind+offs)))
     hold on
-    plot(XY(:,1),XY(:,2),'k'); hold off
+    plot(XY(:,1),XY(:,2),'b','LineWidth',1.5); hold off
     title(sprintf('%s = %i | %s = %7.5f','\alpha',ind+offs,'\lambda',V(ind+offs)))
     xlabel('horizontal pixels')
     ylabel('vertical pixels')
@@ -290,7 +290,7 @@ elseif strcmp(XY,'demo1')
     imagefnan(c11cmnK(1:2),c11cmnK(3:4),psdens);
     hold on
     % Remember the original curve was relative to the Nyquist plane
-    twoplot([KXY ; KXY(1,:)],'b','LineWidth',2); hold off
+    twoplot([KXY ; KXY(1,:)],'r','LineWidth',1.5); hold off
     xlabel('scaled horizontal wavenumbers')
     ylabel('scaled vertical wavenumbers')
   end
@@ -305,7 +305,7 @@ elseif strcmp(XY,'demo1')
   % SPACE-domain functions in PIXEL units
   subplot(121)
   imagefnan(c11cmnR(1:2),c11cmnR(3:4),v2s(EE)); axis image 
-  hold on; plot(XY(:,1),XY(:,2),'k'); hold off
+  hold on; plot(XY(:,1),XY(:,2),'b','LineWdith',1.5); hold off
   title('Eigenvalue weighted SPATIAL sum')
   xlabel('horizontal pixels')
   ylabel('vertical pixels')
@@ -317,7 +317,7 @@ elseif strcmp(XY,'demo1')
   imagefnan(c11cmnK(1:2),c11cmnK(3:4),psdens); axis image
   hold on
   % Remember the original curve was relative to the Nyquist plane
-  plot(KXY(:,1),KXY(:,2),'k'); hold off
+  twoplot([KXY ; KXY(1,:)],'r','LineWidth',1.5); hold off
   title('Eigenvalue weighted SPECTRAL sum')
   xlabel('scaled horizontal wavenumbers')
   ylabel('scaled vertical wavenumbers')
@@ -325,7 +325,7 @@ elseif strcmp(XY,'demo1')
   % Also try this one here
   figure(3)
   clf
-  plot(V,'o-')
+  plot(V,'ko-')
   title(sprintf('sum of the eigenvalues %8.3f',sum(V)))
   longticks(gca,2)
   ylim([-0.1 1.1])
