@@ -31,6 +31,7 @@ function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
 % EXAMPLE:
 %
 % svdslep3('demo1',ngro) % with ngro the growth factor
+% svdslep3('demo2',ngro) % with ngro the growth factor
 % 
 % SEE ALSO:
 %
@@ -66,7 +67,7 @@ if ~isstr(XY)
   fnams=fullfile(getenv('IFILES'),'HASHES',sprintf('%s_%s.mat',upper(mfilename),fname));
 
   % Compute and save or load if presaved
-  if ~exist(fnams,'file')
+  if ~exist(fnams,'file') %|| 1==1
     tt=tic;
 
     % Check the curves and return the range on the inside 
@@ -109,9 +110,9 @@ if ~isstr(XY)
       clf
       % Plot the SPATIAL region of interest exactly as input
       ah(1)=subplot(221);
-      twoplot(XY,'b','LineWidth',1.5); hold on
       % Compute the centroid - my function is from SAGA, but R2022a has its own
       [X0,Y0]=centroid(XY(:,1),XY(:,2));
+      twoplot(XY-repmat([X0 Y0],size(XY,1),1),'b','LineWidth',1.5); hold on
       plot(X0,Y0,'b+')
       axis equal; grid on
       % Just open up the axes a bit
@@ -272,71 +273,46 @@ elseif strcmp(XY,'demo1')
   % Compute the eigenfunctions
   [E,V,c11cmnR,c11cmnK,SE,XY,KXY]=svdslep3(XY,KXY,J,ngro);
 
-  % Plot the first offs+3 basis functions
-  offs=0;
+  % Plot it all
+  aplot(E,V,c11cmnR,c11cmnK,SE,XY,KXY);
+elseif strcmp(XY,'demo2')
+  % Fake the second input now as the growth factor
+  defval('KXY',[]); ngro=KXY; clear KXY
+  
+  % Load the cat and the duck!
+  [c,C]=puss;
+  [d,D]=duck;
 
-  % Make the figures
-  figure(1)
-  clf
-  [ah,ha]=krijetem(subnum(2,3));
-  for ind=1:3
-    % SPACE-domain functions in PIXEL units
-    axes(ah(ind))
-    imagefnan(c11cmnR(1:2),c11cmnR(3:4),v2s(E(:,ind+offs)))
-    hold on
-    plot(XY(:,1),XY(:,2),'b','LineWidth',1.5); hold off
-    title(sprintf('%s = %i | %s = %7.5f','\alpha',ind+offs,'\lambda',V(ind+offs)))
-    xlabel('horizontal pixels')
-    ylabel('vertical pixels')
+  % Input reasonable choices
+  XY=c/5; [X0,Y0]=centroid(d(:,1),d(:,2));
+  XY=XY-repmat([X0 Y0],size(XY,1),1);
 
-    % SPECTRAL-domain functions, periodogram
-    axes(ha(2*ind))
-    psdens=fftshift(decibel(v2s(SE(:,ind+offs))));
-    psdens(psdens<-80)=NaN;
-    imagefnan(c11cmnK(1:2),c11cmnK(3:4),psdens);
+  d=d-repmat([X0 0],size(d,1),1);
+  d(:,2)=max(d(:,2))-d(:,2);
+  s=0.4;
+  KXY=[scale(d(:,1),[-s s]) scale(d(:,2),[s/10 s])];
+
+  J=200;
+  [E,V,c11cmnR,c11cmnK,SE,XY,KXY]=svdslep3(XY,KXY,J,ngro);
+
+  % Plot it all
+  ah=aplot(E,V,c11cmnR,c11cmnK,SE,XY,KXY);
+
+  % Slight cosmetics
+  a=findobj('Color','r');
+  x=get(a(1),'XData');
+  y=get(a(1),'YData');
+  delete(a)
+  [x,y]=penlift(x,y);
+  for in=[4 5 6 8]
+    axes(ah(in))
     hold on
-    % Remember the original curve was relative to the Nyquist plane
-    twoplot([KXY ; KXY(1,:)],'r','LineWidth',1.5); hold off
-    xlabel('scaled horizontal wavenumbers')
-    ylabel('scaled vertical wavenumbers')
+    plot(x,y,'r','LineWidth',1.5)
   end
-
-  % Also try this one here
-  figure(2)
-  clf
-  EE=nansum(repmat(V(:)',length(E),1).*E.^2,2);
-  SEE=nansum(repmat(V(:)',length(E),1).*SE.^2,2);
-
-  % SPACE-domain functions in PIXEL units
-  subplot(121)
-  imagefnan(c11cmnR(1:2),c11cmnR(3:4),v2s(EE)); axis image 
-  hold on; plot(XY(:,1),XY(:,2),'b','LineWidth',1.5); hold off
-  title('Eigenvalue weighted SPATIAL sum')
-  xlabel('horizontal pixels')
-  ylabel('vertical pixels')
-
-  % SPECTRAL-domain functions, periodogram
-  subplot(122)
-  psdens=fftshift(decibel(v2s(SEE)));
-  psdens(psdens<-80)=NaN;
-  imagefnan(c11cmnK(1:2),c11cmnK(3:4),psdens); axis image
-  hold on
-  % Remember the original curve was relative to the Nyquist plane
-  twoplot([KXY ; KXY(1,:)],'r','LineWidth',1.5); hold off
-  title('Eigenvalue weighted SPECTRAL sum')
-  xlabel('scaled horizontal wavenumbers')
-  ylabel('scaled vertical wavenumbers')
-  set(gca,'xtick',[-1:0.5:1],'ytick',[-1:0.5:1])
-
-
-  % Also try this one here
-  figure(3)
-  clf
-  plot(V,'ko-')
-  title(sprintf('sum of the eigenvalues %8.3f',sum(V)))
-  longticks(gca,2)
-  ylim([-0.1 1.1])
-  grid on
+  for in=[1 2 3 7]
+    axes(ah(in))
+    axis ij
+  end
 end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -387,9 +363,10 @@ if nargout>1 || xver==1
   % ...but we make the dimensions (not the domain!) square for now which helps
   % with the Hermiticity constraint and the sampling of the Nyquist plane
   [Nx,Ny]=deal(max(Nx,Ny));
-  % Force the output to be ODD for Hermiticity, so the zero-wavenumber is centered
-  Nx=Nx+~rem(Nx,2);
-  Ny=Ny+~rem(Ny,2);
+  % Force the output to be ODD for Hermiticity, so the zero-wavenumber is
+  % centered - may need to revisit this as unnecessary - and unhelpful?
+%  Nx=Nx+~rem(Nx,2);
+%  Ny=Ny+~rem(Ny,2);
 else
   [xlimt,ylimt,Ny,Nx]=deal(NaN);
 end
@@ -485,8 +462,8 @@ else
   plot(QX(Qin),QY(Qin),'ro')
 end
 hold off
-xlim(minmax(QX(:))*1.1)
-ylim(minmax(QY(:))*1.1)
+openup(gca,5)
+openup(gca,6)
 shrink(gca,1.25,1.25); longticks(gca,2)
 t=title(sprintf('Verifying %s %i x %i isk %i',...
 		upper(cid),size(QX),isk));
@@ -505,3 +482,72 @@ else
 end
 pause
 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+function ah=aplot(E,V,c11cmnR,c11cmnK,SE,XY,KXY)
+
+% Plot the first offs+3 basis functions
+offs=0;
+
+% Make the figures
+figure(1)
+clf
+[ah,ha]=krijetem(subnum(2,3));
+for ind=1:3
+  % SPACE-domain functions in PIXEL units
+  axes(ah(ind))
+  imagefnan(c11cmnR(1:2),c11cmnR(3:4),v2s(E(:,ind+offs)))
+  hold on
+  plot(XY(:,1),XY(:,2),'b','LineWidth',1.5); hold off
+  title(sprintf('%s = %i | %s = %7.5f','\alpha',ind+offs,'\lambda',V(ind+offs)))
+  xlabel('horizontal pixels')
+  ylabel('vertical pixels')
+
+  % SPECTRAL-domain functions, periodogram
+  axes(ha(2*ind))
+  psdens=fftshift(decibel(v2s(SE(:,ind+offs))));
+  psdens(psdens<-80)=NaN;
+  imagefnan(c11cmnK(1:2),c11cmnK(3:4),psdens);
+  hold on
+  % Remember the original curve was relative to the Nyquist plane
+  twoplot([KXY ; KXY(1,:)],'r','LineWidth',1.5); hold off
+  xlabel('scaled horizontal wavenumbers')
+  ylabel('scaled vertical wavenumbers')
+end
+
+% Also try this one here
+figure(2)
+clf
+EE=nansum(repmat(V(:)',length(E),1).*E.^2,2);
+SEE=nansum(repmat(V(:)',length(E),1).*SE.^2,2);
+
+% SPACE-domain functions in PIXEL units
+ah(7)=subplot(121);
+imagefnan(c11cmnR(1:2),c11cmnR(3:4),v2s(EE)); axis image 
+hold on; plot(XY(:,1),XY(:,2),'b','LineWidth',1.5); hold off
+title('Eigenvalue weighted SPATIAL sum')
+xlabel('horizontal pixels')
+ylabel('vertical pixels')
+
+% SPECTRAL-domain functions, periodogram
+ah(8)=subplot(122);
+psdens=fftshift(decibel(v2s(SEE)));
+psdens(psdens<-80)=NaN;
+imagefnan(c11cmnK(1:2),c11cmnK(3:4),psdens); axis image
+hold on
+% Remember the original curve was relative to the Nyquist plane
+twoplot([KXY ; KXY(1,:)],'r','LineWidth',1.5); hold off
+title('Eigenvalue weighted SPECTRAL sum')
+xlabel('scaled horizontal wavenumbers')
+ylabel('scaled vertical wavenumbers')
+set(gca,'xtick',[-1:0.5:1],'ytick',[-1:0.5:1])
+
+longticks(ah)
+
+% Also try this one here
+figure(3)
+clf
+plot(V,'ko-')
+title(sprintf('sum of the eigenvalues %8.3f',sum(V)))
+longticks(gca,2)
+ylim([-0.1 1.1])
+grid on
