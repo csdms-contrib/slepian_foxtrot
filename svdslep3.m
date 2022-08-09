@@ -489,7 +489,12 @@ disp(sprintf('\nHit ENTER to proceed or CTRL-C to abort\n'))
 hold on
 twoplot([XY ; XY(1,:)],'y','LineWidth',2)
 hold off
-xlabel('scaled horizontal wavenumbers')
-ylabel('scaled vertical wavenumbers')
+if isk==0
+  xlabel('horizontal pixels')
+  ylabel('vertical pixels')
+else
+  xlabel('scaled horizontal wavenumbers')
+  ylabel('scaled vertical wavenumbers')
+end
 pause
 
