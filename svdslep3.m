@@ -42,7 +42,7 @@ function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
 defval('J',10);
 defval('ngro',4);
 defval('tol',12);
-defval('xver',0);
+defval('xver',1);
 
 % Default SPATIAL curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
@@ -136,10 +136,10 @@ if ~isstr(XY)
 
       ah(3)=subplot(223);
       % Plot the SPATIAL region of interest after the growth domain
-      plot(QX(QinR),QY(QinR),'k.')
+      plot(QX(QinR),QY(QinR),'b.')
       % The original curve in PIXEL coordinates needs to plot right on here
       hold on
-      twoplot(XY,'k','LineWidth',2)
+      twoplot(XY,'y','LineWidth',2)
       hold off
       axis equal; grid on
       xlim(minmax(QX(:))*1.25)
@@ -150,10 +150,10 @@ if ~isstr(XY)
 
       ah(4)=subplot(224);
       % Plot the SPECTRAL region of interest after the growth domain
-      plot(QKX(QinK),QKY(QinK),'k.')
+      plot(QKX(QinK),QKY(QinK),'r.')
       % The curve in FRACTIONAL coordinates needs to plot right on here
       hold on
-      twoplot([KXY ; KXY(1,:)],'b','LineWidth',2)
+      twoplot([KXY ; KXY(1,:)],'y','LineWidth',2)
       hold off
       grid on
       axis([-1 1 -1 1])
@@ -242,7 +242,7 @@ elseif strcmp(XY,'demo1')
   defval('KXY',[]); ngro=KXY; clear KXY
 
   % Randomize the test
-  if (-1)^round(rand)
+  if 0% round(rand)
     % A circle in SPACE...
     cR=30;
     cN=41;
@@ -251,7 +251,7 @@ elseif strcmp(XY,'demo1')
     % A random blob, fix the radius to be something sizable in pixels
     [x,y]=blob(1,1); XY=[x y]*20; 
   end
-  if (-1)^round(rand)
+  if 0%round(rand)
     % And a BOX in SPECTRAL space, no need to close it as it will get
     % mirrored anyway about the lower symmetry axis...
     R=0.13;
@@ -262,7 +262,7 @@ elseif strcmp(XY,'demo1')
   end
 
   % How many eigenfunctions?
-  J=60;
+  J=30;
   % Compute the eigenfunctions
   [E,V,c11cmnR,c11cmnK,SE,XY,KXY]=svdslep3(XY,KXY,J,ngro);
 
@@ -470,9 +470,13 @@ iFv=iFv(:);
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function cplot(XY,QX,QY,Qin,isk,cid)
 clf
-plot(QX,QY,'k.')
+plot(QX,QY,'.','Color',grey)
 hold on; axis image
-plot(QX(Qin),QY(Qin),'bo')
+if isk==0
+  plot(QX(Qin),QY(Qin),'bo')
+else
+  plot(QX(Qin),QY(Qin),'ro')
+end
 hold off
 xlim(minmax(QX(:))*1.1)
 ylim(minmax(QY(:))*1.1)
