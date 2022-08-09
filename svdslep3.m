@@ -36,13 +36,13 @@ function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
 %
 % LOCALIZATION2D
 %
-% Last modified by fjsimons-at-alum.mit.edu, 08/05/2022
+% Last modified by fjsimons-at-alum.mit.edu, 08/09/2022
 
 % Default values
 defval('J',10);
 defval('ngro',4);
 defval('tol',12);
-defval('xver',0);
+defval('xver',1);
 
 % Default SPATIAL curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
@@ -50,15 +50,15 @@ defval('cN',41)
 defval('XY',...
        cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]')
 
-% And some (half-)square in the SPECTRAL (half-)space
-% Here you use the notion of the Shannon ratio as in SVDSLEP2, which is
-% relative to the grown area which has unit (kx,ky) in the CORNERS
-defval('R',0.1)
-% Remember this R is strictly for convenience in the next line
-defval('KXY',...
-       R*[-1 1  1 -1 -1; 1 1  0  0  1]')
-
 if ~isstr(XY)
+  % And some (half-)square in the SPECTRAL (half-)space
+  % Here you use the notion of the Shannon ratio as in SVDSLEP2, which is
+  % relative to the grown area which has unit (kx,ky) in the CORNERS
+  defval('R',0.1)
+  % Remember this R is strictly for convenience in the next line
+  defval('KXY',...
+	 R*[-1 1  1 -1 -1; 1 1  0  0  1]')
+
   % Check if we've already computed these
   % Make a hash with the input variables so you don't recompute
   fname=hash([XY(:)' KXY(:)' J ngro tol],'SHA-256');
@@ -92,6 +92,7 @@ if ~isstr(XY)
 
     % Ensure hermiticity if the domain is even knowing it was square
     if ~any(rem(newsize,2))
+      disp('You are about to fail Hermiticity')
       % The dci component (see KNUM2) will be in the lower right quadrant
       %[i,j]=ind2sub(newsize,QinK);
       % QinK=QinK(i>min(i)&j>min(j));
@@ -245,7 +246,7 @@ elseif strcmp(XY,'demo1')
   defval('KXY',[]); ngro=KXY; clear KXY
 
   % Randomize the test
-  if (-1)^round(rand)
+  if 1% (-1)^round(rand)
     % A circle in SPACE...
     cR=30;
     cN=41;
@@ -254,7 +255,7 @@ elseif strcmp(XY,'demo1')
     % A random blob, fix the radius to be something sizable in pixels
     [x,y]=blob(1,1); XY=[x y]*20; 
   end
-  if (-1)^round(rand)
+  if 0%(-1)^round(rand)
     % And a BOX in SPECTRAL space, no need to close it as it will get
     % mirrored anyway about the lower symmetry axis...
     R=0.13;
@@ -293,7 +294,7 @@ elseif strcmp(XY,'demo1')
     imagefnan(c11cmnK(1:2),c11cmnK(3:4),psdens);
     hold on
     % Remember the original curve was relative to the Nyquist plane
-    plot(KXY(:,1),KXY(:,2),'b','LineWidth',2); hold off
+    twoplot([KXY ; KXY(1,:)],'b','LineWidth',2); hold off
     xlabel('scaled horizontal wavenumbers')
     ylabel('scaled vertical wavenumbers')
   end
@@ -485,7 +486,7 @@ movev(t,max(abs(QY(:)))/20)
 disp(sprintf('\nHit ENTER to proceed or CTRL-C to abort\n'))
 % Plot the original curve in actual coordinates
 hold on
-plot(XY(:,1),XY(:,2),'y','LineWidth',2)
+twoplot([XY ; XY(1,:)],'y','LineWidth',2)
 hold off
 xlabel('scaled horizontal wavenumbers')
 ylabel('scaled vertical wavenumbers')
