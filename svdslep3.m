@@ -42,7 +42,7 @@ function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
 defval('J',10);
 defval('ngro',4);
 defval('tol',12);
-defval('xver',1);
+defval('xver',0);
 
 % Default SPATIAL curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
@@ -92,13 +92,9 @@ if ~isstr(XY)
 
     % Ensure hermiticity if the domain is even knowing it was square
     if ~any(rem(newsize,2))
-      disp('You are about to fail Hermiticity')
       % The dci component (see KNUM2) will be in the lower right quadrant
-      %[i,j]=ind2sub(newsize,QinK);
-      % QinK=QinK(i>min(i)&j>min(j));
-      % Maybe just add a row and a column to the top?
-      %QinK=sub2ind(newsize,i-1,j-1);
-      % Got to do something - but caught this case within CEXPAND
+      dci=[floor(newsize(1)/2)+1 floor(newsize(2)/2)+1];
+      % Have not needed to adapt this special case lately
     end
         
     % The result must be Hermitian!
@@ -246,7 +242,7 @@ elseif strcmp(XY,'demo1')
   defval('KXY',[]); ngro=KXY; clear KXY
 
   % Randomize the test
-  if 1% (-1)^round(rand)
+  if (-1)^round(rand)
     % A circle in SPACE...
     cR=30;
     cN=41;
@@ -255,7 +251,7 @@ elseif strcmp(XY,'demo1')
     % A random blob, fix the radius to be something sizable in pixels
     [x,y]=blob(1,1); XY=[x y]*20; 
   end
-  if 0%(-1)^round(rand)
+  if (-1)^round(rand)
     % And a BOX in SPECTRAL space, no need to close it as it will get
     % mirrored anyway about the lower symmetry axis...
     R=0.13;
@@ -432,17 +428,18 @@ if isk==0
   c11=[xylimt(1) xylimt(4)]+[-addx  addy];
   cmn=[xylimt(2) xylimt(3)]+[ addx -addy];
 else
-  % The Nyquist plane in wavenumber space in relative coordinates
+  % The Nyquist plane in wavenumber space in relative coordinates, see KNUM2
   % That's all you need to do, there is no "expansion" to speak of since
-  % all we do is work on the discretization of the SPATIAL coordinates
-  c11=[-1  1];
-  cmn=[ 1 -1];
+  % all we do is work on the discretization of the SPATIAL coordinates.
+  % We this note this is only [-1 -1] in the top LEFT corner for EVEN sizes
+  c11=2*[-floor( newsize(2)   /2)/newsize(2)  -floor( newsize(1)   /2)/newsize(1)];
+  cmn=2*[ floor((newsize(2)-1)/2)/newsize(2)   floor((newsize(1)-1)/2)/newsize(1)];
 end
 c11cmn=[c11 cmn];
 
 % Now compute the coordinates in the embedding
 qx=linspace(c11(1),cmn(1),newsize(2));
-qy=linspace(cmn(2),c11(2),newsize(1));
+qy=linspace(c11(2),cmn(2),newsize(1));
 [QX,QY]=meshgrid(qx,qy);
 Qin=find(inpolygon(QX,QY,XY(:,1),XY(:,2)));
 
