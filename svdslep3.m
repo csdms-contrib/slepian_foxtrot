@@ -66,7 +66,7 @@ if ~isstr(XY)
   fnams=fullfile(getenv('IFILES'),'HASHES',sprintf('%s_%s.mat',upper(mfilename),fname));
 
   % Compute and save or load if presaved
-  if ~exist(fnams,'file') | 1==1
+  if ~exist(fnams,'file')
     tt=tic;
 
     % Check the curves and return the range on the inside 
