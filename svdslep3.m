@@ -221,10 +221,13 @@ if ~isstr(XY)
       E=real(E); E=E./repmat(diag(sqrt(E'*E))',size(E,1),1);
     end
 
+    % Protect against NaNs
+    h=isnan(V); V=V(~h); E=E(:,~h); J=sum(~h);
+
     if nargout>4
       % Get the power spectrum
       SE=zeros(prod(newsize),size(E,2));
-      for i=1:size(E,2),
+      for i=1:size(E,2)
 	SE(:,i)=indeks((abs(fft2(v2s(E(:,i)))).^2),':');
       end
     else
@@ -245,23 +248,23 @@ elseif strcmp(XY,'demo1')
   defval('KXY',[]); ngro=KXY; clear KXY
 
   % Randomize the test
-  if 0% round(rand)
+  if 0%round(rand)
     % A circle in SPACE...
     cR=30;
     cN=41;
     XY=cR*[cos(linspace(0,2*pi,cN)) ; sin(linspace(0,2*pi,cN))]';
   else
     % A random blob, fix the radius to be something sizable in pixels
-    [x,y]=blob(1,1); XY=[x y]*20; 
+    [x,y]=blob(1,2); XY=[x y]*20; 
   end
-  if 0%round(rand)
+  if 0 %round(rand)
     % And a BOX in SPECTRAL space, no need to close it as it will get
     % mirrored anyway about the lower symmetry axis...
     R=0.13;
     KXY=R*[-1 -1 1 1 ; 0 1 1 0]';
   else
     % A random blob in relative coordinates that are somewhat appropriate
-    [kx,ky]=blob(1,1); KXY=[kx ky]/3; KXY=KXY(KXY(:,2)>=0,:);
+    [kx,ky]=blob(1,2); KXY=[kx ky]/3; KXY=KXY(KXY(:,2)>=0,:);
   end
 
   % How many eigenfunctions?
@@ -297,7 +300,6 @@ elseif strcmp(XY,'demo1')
     xlabel('scaled horizontal wavenumbers')
     ylabel('scaled vertical wavenumbers')
   end
-  fig2print(gcf,'landscape')
 
   % Also try this one here
   figure(2)
