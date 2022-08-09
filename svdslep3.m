@@ -42,7 +42,7 @@ function varargout=svdslep3(XY,KXY,J,ngro,tol,xver)
 defval('J',10);
 defval('ngro',4);
 defval('tol',12);
-defval('xver',1);
+defval('xver',0);
 
 % Default SPATIAL curve is a CIRCLE in PIXEL space, of radius cR and cN points
 defval('cR',30)
@@ -168,10 +168,13 @@ if ~isstr(XY)
       set(ah(3),'ytick',sort(unique(round(...
        		 [c11cmnR(4):round(range(c11cmnR([2 4]))/ntix):c11cmnR(2) c11cmnR(2)]))))
       % SPECTRAL coordinates are already fractions and need to include zero
-      set(ah(4),'xtick',sort(unique(round(...
-       		 [0 c11cmnK(1):round(range(c11cmnK([1 3])*100)/ntix)/100:c11cmnK(3) c11cmnK(3)]*100)/100)))
+%      set(ah(4),'xtick',sort(unique(round(...
+%       		 [0 c11cmnK(1):round(range(c11cmnK([1 3])*100)/ntix)/100:c11cmnK(3) c11cmnK(3)]*100)/100)))
       set(ah(4),'ytick',sort(unique(round(...
        		 [0 c11cmnK(4):round(range(c11cmnK([2 4]))*100/ntix)/100:c11cmnK(2) c11cmnK(2)]*100)/100)))
+      % The above wasn't super cool
+      set(ah(4),'xtick',[-1:0.5:1],'ytick',[-1:0.5:1])
+
       set(ah(3:4),'GridLineStyle',':')
 
       disp(sprintf('\nType DBCONT to proceed or DBQUIT to quit\n'))
@@ -299,13 +302,13 @@ elseif strcmp(XY,'demo1')
   % Also try this one here
   figure(2)
   clf
-  EE=sum(repmat(V(:)',length(E),1).*E.^2,2);
-  SEE=sum(repmat(V(:)',length(E),1).*SE.^2,2);
+  EE=nansum(repmat(V(:)',length(E),1).*E.^2,2);
+  SEE=nansum(repmat(V(:)',length(E),1).*SE.^2,2);
 
   % SPACE-domain functions in PIXEL units
   subplot(121)
   imagefnan(c11cmnR(1:2),c11cmnR(3:4),v2s(EE)); axis image 
-  hold on; plot(XY(:,1),XY(:,2),'b','LineWdith',1.5); hold off
+  hold on; plot(XY(:,1),XY(:,2),'b','LineWidth',1.5); hold off
   title('Eigenvalue weighted SPATIAL sum')
   xlabel('horizontal pixels')
   ylabel('vertical pixels')
