@@ -324,6 +324,8 @@ elseif strcmp(XY,'demo1')
   title('Eigenvalue weighted SPECTRAL sum')
   xlabel('scaled horizontal wavenumbers')
   ylabel('scaled vertical wavenumbers')
+  set(gca,'xtick',[-1:0.5:1],'ytick',[-1:0.5:1])
+
 
   % Also try this one here
   figure(3)
