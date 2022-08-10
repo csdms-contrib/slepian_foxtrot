@@ -10,11 +10,14 @@ function varargout=puss
 %
 % DUCK
 %
-% Last modified by fjsimons-at-alum.mit.edu, 08/09/2022
+% Last modified by fjsimons-at-alum.mit.edu, 08/10/2022
 
-try
-  load(fullfile(getenv('EPS'),'puss.mat'))
-catch
+% Where I keep the file
+fname=fullfile(getenv('EPS'),'puss.mat');
+
+if exist(fname,'file')
+  load(fname)
+else
   % Get the image
   C=imread(fullfile(getenv('EPS'),'puss.jpg'));
   
