@@ -15,11 +15,14 @@ function varargout=duck(p,t)
 %
 % PUSS
 % 
-% Last modified by fjsimons-at-alum.mit.edu, 08/09/2022
+% Last modified by fjsimons-at-alum.mit.edu, 08/10/2022
 
-try 
-  load(fullfile(getenv('EPS'),'duck.mat'));
-catch
+% Where I keep the file
+fname=fullfile(getenv('EPS'),'duck.mat');
+
+if exist(fname,'file')
+  load(fname)
+else
   defval('p',30)
   defval('t',417)
 
